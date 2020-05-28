@@ -115,10 +115,16 @@ class GymAI(object):
                 p1_hp_pre = self.pre_framedata.getCharacter(True).getHp()
                 p2_hp_now = self.frameData.getCharacter(False).getHp()
                 p1_hp_now = self.frameData.getCharacter(True).getHp()
+                frame_num_pre = self.pre_framedata.getFramesNumber()
+                frame_num_now = self.frameData.getFramesNumber()
+                p1_hit_count_now = self.frameData.getCharacter(True).getHitCount()
+                p2_hit_count_now = self.frameData.getCharacter(False).getHitCount()
                 if self.player:
-                    reward = (p2_hp_pre-p2_hp_now) - (p1_hp_pre-p1_hp_now)
+                    reward = (p2_hp_pre-p2_hp_now) - (p1_hp_pre-p1_hp_now) \
+                             + (p1_hit_count_now - p2_hit_count_now) - (frame_num_now - frame_num_pre) / 60
                 else:
-                    reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now)
+                    reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now) \
+                             + (p2_hit_count_now - p1_hit_count_now) - (frame_num_now - frame_num_pre) / 60
         except:
             reward = 0
         return reward
@@ -130,22 +136,38 @@ class GymAI(object):
         # my information
         myHp = abs(my.getHp() / 400)
         myEnergy = my.getEnergy() / 300
-        myX = ((my.getLeft() + my.getRight()) / 2) / 960
-        myY = ((my.getBottom() + my.getTop()) / 2) / 640
-        mySpeedX = my.getSpeedX() / 15
-        mySpeedY = my.getSpeedY() / 28
-        myState = my.getAction().ordinal()
+        myLeft = my.getLeft() / 960
+        myRight = my.getRight() / 960
+        myBottom = my.getBottom() / 640
+        myTop = my.getTop() / 640
+        mySpeedXAbs = abs(my.getSpeedX() / 15)
+        mySpeedXDirection = 0 if my.getSpeedX() < 0 else 1
+        mySpeedYAbs = abs(my.getSpeedY() / 28)
+        mySpeedYDirection = 0 if my.getSpeedY() < 0 else 1
+        myHitCount = my.getHitCount() / 20
+        myisHitConfirm = 1 if my.isHitConfirm() else 0
+        myisControl = 1 if my.isControl() else 0
         myRemainingFrame = my.getRemainingFrame() / 70
+        myState = my.getState().ordinal()
+        myAction = my.getAction().ordinal()
 
         # opp information
         oppHp = abs(opp.getHp() / 400)
         oppEnergy = opp.getEnergy() / 300
-        oppX = ((opp.getLeft() + opp.getRight()) / 2) / 960
-        oppY = ((opp.getBottom() + opp.getTop()) / 2) / 640
-        oppSpeedX = opp.getSpeedX() / 15
-        oppSpeedY = opp.getSpeedY() / 28
-        oppState = opp.getAction().ordinal()
+        oppLeft = opp.getLeft() / 960
+        oppRight = opp.getRight() / 960
+        oppBottom = opp.getBottom() / 640
+        oppTop = opp.getTop() / 640
+        oppSpeedXAbs = abs(opp.getSpeedX() / 15)
+        oppSpeedXDirection = 0 if opp.getSpeedX() < 0 else 1
+        oppSpeedYAbs = abs(opp.getSpeedY() / 28)
+        oppSpeedYDirection = 0 if opp.getSpeedY() < 0 else 1
+        oppHitCount = opp.getHitCount() / 20
+        oppisHitConfirm = 1 if opp.isHitConfirm() else 0
+        oppisControl = 1 if opp.isControl() else 0
         oppRemainingFrame = opp.getRemainingFrame() / 70
+        oppState = opp.getState().ordinal()
+        oppAction = opp.getAction().ordinal()
 
         # time information
         game_frame_num = self.frameData.getFramesNumber() / 3600
@@ -153,48 +175,57 @@ class GymAI(object):
         observation = []
 
         # my information
-        observation.append(myHp)
-        observation.append(myEnergy)
-        observation.append(myX)
-        observation.append(myY)
-        if mySpeedX < 0:
-            observation.append(0)
-        else:
-            observation.append(1)
-        observation.append(abs(mySpeedX))
-        if mySpeedY < 0:
-            observation.append(0)
-        else:
-            observation.append(1)
-        observation.append(abs(mySpeedY))
-        for i in range(56):
+        observation += [myHp,
+                        myEnergy,
+                        myLeft,
+                        myRight,
+                        myBottom,
+                        myTop,
+                        mySpeedXDirection,
+                        mySpeedYDirection,
+                        mySpeedXAbs,
+                        mySpeedYAbs,
+                        myHitCount,
+                        myisHitConfirm,
+                        myisControl,
+                        myRemainingFrame,]
+        for i in range(4):
             if i == myState:
                 observation.append(1)
             else:
                 observation.append(0)
-        observation.append(myRemainingFrame)
+        for i in range(56):
+            if i == myAction:
+                observation.append(1)
+            else:
+                observation.append(0)
+
 
         # opp information
-        observation.append(oppHp)
-        observation.append(oppEnergy)
-        observation.append(oppX)
-        observation.append(oppY)
-        if oppSpeedX < 0:
-            observation.append(0)
-        else:
-            observation.append(1)
-        observation.append(abs(oppSpeedX))
-        if oppSpeedY < 0:
-            observation.append(0)
-        else:
-            observation.append(1)
-        observation.append(abs(oppSpeedY))
-        for i in range(56):
+        observation += [oppHp,
+                        oppEnergy,
+                        oppLeft,
+                        oppRight,
+                        oppBottom,
+                        oppTop,
+                        oppSpeedXDirection,
+                        oppSpeedYDirection,
+                        oppSpeedXAbs,
+                        oppSpeedYAbs,
+                        oppHitCount,
+                        oppisHitConfirm,
+                        oppisControl,
+                        oppRemainingFrame, ]
+        for i in range(4):
             if i == oppState:
                 observation.append(1)
             else:
                 observation.append(0)
-        observation.append(oppRemainingFrame)
+        for i in range(56):
+            if i == oppAction:
+                observation.append(1)
+            else:
+                observation.append(0)
 
         # time information
         observation.append(game_frame_num)
@@ -202,69 +233,113 @@ class GymAI(object):
         myProjectiles = self.frameData.getProjectilesByP1()
         oppProjectiles = self.frameData.getProjectilesByP2()
 
-        if len(myProjectiles) == 2:
-            myHitDamage = myProjectiles[0].getHitDamage() / 200.0
-            myHitAreaNowX = ((myProjectiles[0].getCurrentHitArea().getLeft() + myProjectiles[
-                0].getCurrentHitArea().getRight()) / 2) / 960.0
-            myHitAreaNowY = ((myProjectiles[0].getCurrentHitArea().getTop() + myProjectiles[
-                0].getCurrentHitArea().getBottom()) / 2) / 640.0
-            observation.append(myHitDamage)
-            observation.append(myHitAreaNowX)
-            observation.append(myHitAreaNowY)
-            myHitDamage = myProjectiles[1].getHitDamage() / 200.0
-            myHitAreaNowX = ((myProjectiles[1].getCurrentHitArea().getLeft() + myProjectiles[
-                1].getCurrentHitArea().getRight()) / 2) / 960.0
-            myHitAreaNowY = ((myProjectiles[1].getCurrentHitArea().getTop() + myProjectiles[
-                1].getCurrentHitArea().getBottom()) / 2) / 640.0
-            observation.append(myHitDamage)
-            observation.append(myHitAreaNowX)
-            observation.append(myHitAreaNowY)
-        elif len(myProjectiles) == 1:
-            myHitDamage = myProjectiles[0].getHitDamage() / 200.0
-            myHitAreaNowX = ((myProjectiles[0].getCurrentHitArea().getLeft() + myProjectiles[
-                0].getCurrentHitArea().getRight()) / 2) / 960.0
-            myHitAreaNowY = ((myProjectiles[0].getCurrentHitArea().getTop() + myProjectiles[
-                0].getCurrentHitArea().getBottom()) / 2) / 640.0
-            observation.append(myHitDamage)
-            observation.append(myHitAreaNowX)
-            observation.append(myHitAreaNowY)
-            for t in range(3):
-                observation.append(0.0)
-        else:
-            for t in range(6):
-                observation.append(0.0)
+        # should be the maximum projectile a character can own at same time, not sure is 2, originally is 2
+        for i in range(2):
+            if i < len(myProjectiles):
+                myHitDamage = myProjectiles[i].getHitDamage() / 400.0
+                myGuardDamage = myProjectiles[i].getGuardDamage() / 400.0
+                myStartAddEnergy = myProjectiles[i].getStartAddEnergy() / 300.0
+                myHitAddEnergy = myProjectiles[i].getHitAddEnergy() / 300.0
+                myGuardAddEnergy = myProjectiles[i].getGuardAddEnergy() / 300.0
+                myGiveEnergy = myProjectiles[i].getGiveEnergy() / 300.0
+                myDownProp = 1 if myProjectiles[i].isDownProp() else 0
+                myIsProjectile = 1 if myProjectiles[i].isProjectile() else 0
+                myHitSpeedXAbs = abs(myProjectiles[i].getSpeedX() / 15.0)
+                myHitSpeedXDirection = 0 if myProjectiles[i].getSpeedX() < 0 else 1
+                myHitSpeedYAbs = abs(myProjectiles[i].getSpeedY() / 28.0)
+                myHitSpeedYDirection = 0 if myProjectiles[i].getSpeedY() < 0 else 1
+                myHitAreaNowLeft = myProjectiles[i].getCurrentHitArea().getLeft() / 960.0
+                myHitAreaNowRight = myProjectiles[i].getCurrentHitArea().getRight() / 960.0
+                myHitAreaNowTop = myProjectiles[i].getCurrentHitArea().getTop() / 640.0
+                myHitAreaNowBottom = myProjectiles[i].getCurrentHitArea().getBottom() / 640.0
+                myImpactX = myProjectiles[i].getImpactX() / 960.0
+                myImpactY = myProjectiles[i].getImpactY() / 640.0
+                myStartUp = myProjectiles[i].getGiveEnergy() / 70
+                myActive = myProjectiles[i].getGiveEnergy() / 70
+                myGiveGuardRecov = myProjectiles[i].getGiveGuardRecov / 70
+                myAttackType = myProjectiles[i].getAttackType()
+                observation += [myHitDamage,
+                                myGuardDamage,
+                                myStartAddEnergy,
+                                myHitAddEnergy,
+                                myGuardAddEnergy,
+                                myGiveEnergy,
+                                myDownProp,
+                                myIsProjectile,
+                                myHitSpeedXAbs,
+                                myHitSpeedXDirection,
+                                myHitSpeedYAbs,
+                                myHitSpeedYDirection,
+                                myHitAreaNowLeft,
+                                myHitAreaNowRight,
+                                myHitAreaNowTop,
+                                myHitAreaNowBottom,
+                                myImpactX,
+                                myImpactY,
+                                myStartUp,
+                                myActive,
+                                myGiveGuardRecov, ]
+                for j in range(4):
+                    if j == myAttackType:
+                        observation.append(1)
+                    else:
+                        observation.append(0)
+            else:
+                for t in range(25):
+                    observation.append(0.0)
 
-        if len(oppProjectiles) == 2:
-            oppHitDamage = oppProjectiles[0].getHitDamage() / 200.0
-            oppHitAreaNowX = ((oppProjectiles[0].getCurrentHitArea().getLeft() + oppProjectiles[
-                0].getCurrentHitArea().getRight()) / 2) / 960.0
-            oppHitAreaNowY = ((oppProjectiles[0].getCurrentHitArea().getTop() + oppProjectiles[
-                0].getCurrentHitArea().getBottom()) / 2) / 640.0
-            observation.append(oppHitDamage)
-            observation.append(oppHitAreaNowX)
-            observation.append(oppHitAreaNowY)
-            oppHitDamage = oppProjectiles[1].getHitDamage() / 200.0
-            oppHitAreaNowX = ((oppProjectiles[1].getCurrentHitArea().getLeft() + oppProjectiles[
-                1].getCurrentHitArea().getRight()) / 2) / 960.0
-            oppHitAreaNowY = ((oppProjectiles[1].getCurrentHitArea().getTop() + oppProjectiles[
-                1].getCurrentHitArea().getBottom()) / 2) / 640.0
-            observation.append(oppHitDamage)
-            observation.append(oppHitAreaNowX)
-            observation.append(oppHitAreaNowY)
-        elif len(oppProjectiles) == 1:
-            oppHitDamage = oppProjectiles[0].getHitDamage() / 200.0
-            oppHitAreaNowX = ((oppProjectiles[0].getCurrentHitArea().getLeft() + oppProjectiles[
-                0].getCurrentHitArea().getRight()) / 2) / 960.0
-            oppHitAreaNowY = ((oppProjectiles[0].getCurrentHitArea().getTop() + oppProjectiles[
-                0].getCurrentHitArea().getBottom()) / 2) / 640.0
-            observation.append(oppHitDamage)
-            observation.append(oppHitAreaNowX)
-            observation.append(oppHitAreaNowY)
-            for t in range(3):
-                observation.append(0.0)
-        else:
-            for t in range(6):
-                observation.append(0.0)
+            if i < len(oppProjectiles):
+                oppHitDamage = oppProjectiles[i].getHitDamage() / 400.0
+                oppGuardDamage = oppProjectiles[i].getGuardDamage() / 400.0
+                oppStartAddEnergy = oppProjectiles[i].getStartAddEnergy() / 300.0
+                oppHitAddEnergy = oppProjectiles[i].getHitAddEnergy() / 300.0
+                oppGuardAddEnergy = oppProjectiles[i].getGuardAddEnergy() / 300.0
+                oppGiveEnergy = oppProjectiles[i].getGiveEnergy() / 300.0
+                oppDownProp = 1 if oppProjectiles[i].isDownProp() else 0
+                oppIsProjectile = 1 if oppProjectiles[i].isProjectile() else 0
+                oppHitSpeedXAbs = abs(oppProjectiles[i].getSpeedX() / 15.0)
+                oppHitSpeedXDirection = 0 if oppProjectiles[i].getSpeedX() < 0 else 1
+                oppHitSpeedYAbs = abs(oppProjectiles[i].getSpeedY() / 28.0)
+                oppHitSpeedYDirection = 0 if oppProjectiles[i].getSpeedY() < 0 else 1
+                oppHitAreaNowLeft = oppProjectiles[i].getCurrentHitArea().getLeft() / 960.0
+                oppHitAreaNowRight = oppProjectiles[i].getCurrentHitArea().getRight() / 960.0
+                oppHitAreaNowTop = oppProjectiles[i].getCurrentHitArea().getTop() / 640.0
+                oppHitAreaNowBottom = oppProjectiles[i].getCurrentHitArea().getBottom() / 640.0
+                oppImpactX = oppProjectiles[i].getImpactX() / 960.0
+                oppImpactY = oppProjectiles[i].getImpactY() / 640.0
+                oppStartUp = oppProjectiles[i].getGiveEnergy() / 70
+                oppActive = oppProjectiles[i].getGiveEnergy() / 70
+                oppGiveGuardRecov = oppProjectiles[i].getGiveGuardRecov / 70
+                oppAttackType = oppProjectiles[i].getAttackType()
+                observation += [oppHitDamage,
+                                oppGuardDamage,
+                                oppStartAddEnergy,
+                                oppHitAddEnergy,
+                                oppGuardAddEnergy,
+                                oppGiveEnergy,
+                                oppDownProp,
+                                oppIsProjectile,
+                                oppHitSpeedXAbs,
+                                oppHitSpeedXDirection,
+                                oppHitSpeedYAbs,
+                                oppHitSpeedYDirection,
+                                oppHitAreaNowLeft,
+                                oppHitAreaNowRight,
+                                oppHitAreaNowTop,
+                                oppHitAreaNowBottom,
+                                oppImpactX,
+                                oppImpactY,
+                                oppStartUp,
+                                oppActive,
+                                oppGiveGuardRecov, ]
+                for j in range(4):
+                    if j == oppAttackType:
+                        observation.append(1)
+                    else:
+                        observation.append(0)
+            else:
+                for t in range(25):
+                    observation.append(0.0)
 
         observation = np.array(observation, dtype=np.float32)
         observation = np.clip(observation, 0, 1)

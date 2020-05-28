@@ -109,13 +109,13 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         if self.system_name == "windows":
             # -Xms1024m -Xmx1024m we need set this in windows
             self.java_env = subprocess.Popen(["java", "-Xms1024m", "-Xmx1024m", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
-                                          "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
+                                          "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
         elif self.system_name == "linux":
-            self.java_env = subprocess.Popen(["java", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
-                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
+            self.java_env = subprocess.Popen(["java","-verbose:class", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
+                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
         elif self.system_name == "macos":
             self.java_env = subprocess.Popen(["java", "-XstartOnFirstThread", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
-                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
+                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
         # self.java_env = subprocess.Popen(["java", "-cp", "/home/myt/gym-fightingice/gym_fightingice/FightingICE.jar:/home/myt/gym-fightingice/gym_fightingice/lib/lwjgl/*:/home/myt/gym-fightingice/gym_fightingice/lib/natives/linux/*:/home/myt/gym-fightingice/gym_fightingice/lib/*", "Main", "--port", str(self.free_port), "--py4j", "--c1", "ZEN", "--c2", "ZEN","--fastmode", "--grey-bg", "--inverted-player", "1", "--mute"])
         # sleep 3s for java starting, if your machine is slow, make it longer
         time.sleep(3)
