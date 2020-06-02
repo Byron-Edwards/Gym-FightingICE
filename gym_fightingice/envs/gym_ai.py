@@ -256,7 +256,7 @@ class GymAI(object):
                 myImpactY = myProjectiles[i].getImpactY() / 640.0
                 myStartUp = myProjectiles[i].getGiveEnergy() / 70
                 myActive = myProjectiles[i].getGiveEnergy() / 70
-                myGiveGuardRecov = myProjectiles[i].getGiveGuardRecov / 70
+                myGiveGuardRecov = myProjectiles[i].getGiveGuardRecov() / 70
                 myAttackType = myProjectiles[i].getAttackType()
                 observation += [myHitDamage,
                                 myGuardDamage,
@@ -309,7 +309,7 @@ class GymAI(object):
                 oppImpactY = oppProjectiles[i].getImpactY() / 640.0
                 oppStartUp = oppProjectiles[i].getGiveEnergy() / 70
                 oppActive = oppProjectiles[i].getGiveEnergy() / 70
-                oppGiveGuardRecov = oppProjectiles[i].getGiveGuardRecov / 70
+                oppGiveGuardRecov = oppProjectiles[i].getGiveGuardRecov() / 70
                 oppAttackType = oppProjectiles[i].getAttackType()
                 observation += [oppHitDamage,
                                 oppGuardDamage,

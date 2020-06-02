@@ -30,7 +30,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
 
     def __init__(self, **kwargs):
 
-        self.freq_restart_java = 3
+        self.freq_restart_java = 1
         self.java_env_path = os.getcwd()
 
         if "java_env_path" in kwargs.keys():
@@ -51,7 +51,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         _actions = "AIR AIR_A AIR_B AIR_D_DB_BA AIR_D_DB_BB AIR_D_DF_FA AIR_D_DF_FB AIR_DA AIR_DB AIR_F_D_DFA AIR_F_D_DFB AIR_FA AIR_FB AIR_GUARD AIR_GUARD_RECOV AIR_RECOV AIR_UA AIR_UB BACK_JUMP BACK_STEP CHANGE_DOWN CROUCH CROUCH_A CROUCH_B CROUCH_FA CROUCH_FB CROUCH_GUARD CROUCH_GUARD_RECOV CROUCH_RECOV DASH DOWN FOR_JUMP FORWARD_WALK JUMP LANDING NEUTRAL RISE STAND STAND_A STAND_B STAND_D_DB_BA STAND_D_DB_BB STAND_D_DF_FA STAND_D_DF_FB STAND_D_DF_FC STAND_F_D_DFA STAND_F_D_DFB STAND_FA STAND_FB STAND_GUARD STAND_GUARD_RECOV STAND_RECOV THROW_A THROW_B THROW_HIT THROW_SUFFER"
         action_strs = _actions.split(" ")
 
-        self.observation_space = spaces.Box(low=0, high=1, shape=(143,))
+        self.observation_space = spaces.Box(low=0, high=1, shape=(249,))
         self.action_space = spaces.Discrete(len(action_strs))
 
         os_name = platform.system()
@@ -111,13 +111,14 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
             self.java_env = subprocess.Popen(["java", "-Xms1024m", "-Xmx1024m", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                           "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
         elif self.system_name == "linux":
-            self.java_env = subprocess.Popen(["java","-verbose:class", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
-                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
+            self.java_env = subprocess.Popen(["java","-verbose:class","-Dsun.reflect.inflationThreshold=2147483647","-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
+                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window","-r","1000"],stdout=devnull,)
         elif self.system_name == "macos":
             self.java_env = subprocess.Popen(["java", "-XstartOnFirstThread", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                             "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
         # self.java_env = subprocess.Popen(["java", "-cp", "/home/myt/gym-fightingice/gym_fightingice/FightingICE.jar:/home/myt/gym-fightingice/gym_fightingice/lib/lwjgl/*:/home/myt/gym-fightingice/gym_fightingice/lib/natives/linux/*:/home/myt/gym-fightingice/gym_fightingice/lib/*", "Main", "--port", str(self.free_port), "--py4j", "--c1", "ZEN", "--c2", "ZEN","--fastmode", "--grey-bg", "--inverted-player", "1", "--mute"])
         # sleep 3s for java starting, if your machine is slow, make it longer
+        print("wait for Java starting...")
         time.sleep(3)
 
     def _start_gateway(self, p2=Machete):
@@ -132,7 +133,8 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         # create pipe between gym_env_api and python_ai for java env
         server, client = Pipe()
         self.pipe = server
-        self.p1 = GymAI(self.gateway, client, False)
+        self.client = client
+        self.p1 = GymAI(self.gateway, self.client, False)
         self.manager.registerAI(self.p1.__class__.__name__, self.p1)
 
         if isinstance(p2, str):
@@ -156,11 +158,15 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
     def _close_gateway(self):
         self.gateway.close_callback_server()
         self.gateway.close()
+        self.gateway.shutdown_callback_server()
+        self.gateway.shutdown()
         del self.gateway
 
     def _close_java_game(self):
         self.java_env.kill()
         del self.java_env
+        self.client.close()
+        del self.client
         self.pipe.close()
         del self.pipe
         self.game_started = False
@@ -177,14 +183,14 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
             self._start_gateway(p2)
 
         # to provide crash, restart java game in some freq
-        if self.round_num == self.freq_restart_java * 3:  # 3 is for round in one game
-            try:
-                self._close_gateway()
-                self._close_java_game()
-                self._start_java_game()
-            except:
-                raise SystemExit("Can not restart game")
-            self._start_gateway(p2)
+        # if self.round_num == self.freq_restart_java * 3:  # 3 is for round in one game
+        #     try:
+        #         self._close_gateway()
+        #         self._close_java_game()
+        #         self._start_java_game()
+        #         self._start_gateway(p2)
+        #     except:
+        #         raise SystemExit("Can not restart game")
 
         # just reset is anything ok
         self.pipe.send("reset")
@@ -195,13 +201,21 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
     def step(self, action):
         # check if game is running, if not try restart
         # when restart, dict will contain crash info, agent should do something, it is a BUG in this version
+
         if self.game_started is False:
             dict = {}
             dict["pre_game_crashed"] = True
+            print(dict)
             return self.reset(), 0, None, dict
 
         self.pipe.send(["step", action])
-        new_obs, reward, done, info = self.pipe.recv()
+        if self.pipe.poll(1):
+            new_obs, reward, done, info = self.pipe.recv()
+        else:
+            dict = {}
+            dict["no_data_receive"] = True
+            print("server can not receive, request to reset the game")
+            return None, 0, None, dict
         return new_obs, reward, done, {}
 
     def render(self, mode='human'):
