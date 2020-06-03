@@ -6,7 +6,6 @@ class GymAI(object):
     def __init__(self, gateway, pipe, frameskip=True):
         self.gateway = gateway
         self.pipe = pipe
-
         self.width = 96  # The width of the display to obtain
         self.height = 64  # The height of the display to obtain
         self.grayscale = True  # The display's color to obtain true for grayscale, false for RGB
@@ -14,8 +13,28 @@ class GymAI(object):
         self.obs = None
         self.just_inited = True
 
-        self._actions = "AIR AIR_A AIR_B AIR_D_DB_BA AIR_D_DB_BB AIR_D_DF_FA AIR_D_DF_FB AIR_DA AIR_DB AIR_F_D_DFA AIR_F_D_DFB AIR_FA AIR_FB AIR_GUARD AIR_GUARD_RECOV AIR_RECOV AIR_UA AIR_UB BACK_JUMP BACK_STEP CHANGE_DOWN CROUCH CROUCH_A CROUCH_B CROUCH_FA CROUCH_FB CROUCH_GUARD CROUCH_GUARD_RECOV CROUCH_RECOV DASH DOWN FOR_JUMP FORWARD_WALK JUMP LANDING NEUTRAL RISE STAND STAND_A STAND_B STAND_D_DB_BA STAND_D_DB_BB STAND_D_DF_FA STAND_D_DF_FB STAND_D_DF_FC STAND_F_D_DFA STAND_F_D_DFB STAND_FA STAND_FB STAND_GUARD STAND_GUARD_RECOV STAND_RECOV THROW_A THROW_B THROW_HIT THROW_SUFFER"
-        self.action_strs = self._actions.split(" ")
+        self.action_strs = {0: 'AIR', 1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
+                            6: 'AIR_D_DF_FB', 7: 'AIR_DA', 8: 'AIR_DB', 9: 'AIR_F_D_DFA', 10: 'AIR_F_D_DFB',
+                            11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 14: 'AIR_GUARD_RECOV', 15: 'AIR_RECOV',
+                            16: 'AIR_UA', 17: 'AIR_UB', 18: 'BACK_JUMP', 19: 'BACK_STEP', 20: 'CHANGE_DOWN',
+                            21: 'CROUCH', 22: 'CROUCH_A', 23: 'CROUCH_B', 24: 'CROUCH_FA', 25: 'CROUCH_FB',
+                            26: 'CROUCH_GUARD', 27: 'CROUCH_GUARD_RECOV', 28: 'CROUCH_RECOV', 29: 'DASH', 30: 'DOWN',
+                            31: 'FOR_JUMP', 32: 'FORWARD_WALK', 33: 'JUMP', 34: 'LANDING', 35: 'NEUTRAL', 36: 'RISE',
+                            37: 'STAND', 38: 'STAND_A', 39: 'STAND_B', 40: 'STAND_D_DB_BA', 41: 'STAND_D_DB_BB',
+                            42: 'STAND_D_DF_FA', 43: 'STAND_D_DF_FB', 44: 'STAND_D_DF_FC', 45: 'STAND_F_D_DFA',
+                            46: 'STAND_F_D_DFB', 47: 'STAND_FA', 48: 'STAND_FB', 49: 'STAND_GUARD',
+                            50: 'STAND_GUARD_RECOV', 51: 'STAND_RECOV', 52: 'THROW_A', 53: 'THROW_B', 54: 'THROW_HIT',
+                            55: 'THROW_SUFFER'}
+        self.actions_air = {1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
+                            6: 'AIR_D_DF_FB', 7: 'AIR_DA', 8: 'AIR_DB', 9: 'AIR_F_D_DFA', 10: 'AIR_F_D_DFB',
+                            11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 16: 'AIR_UA', 17: 'AIR_UB'}
+
+        self.actions_ground = {18: 'BACK_JUMP', 19: 'BACK_STEP', 22: 'CROUCH_A', 23: 'CROUCH_B', 24: 'CROUCH_FA',
+                               25: 'CROUCH_FB', 26: 'CROUCH_GUARD', 29: 'DASH', 31: 'FOR_JUMP', 32: 'FORWARD_WALK',
+                               33: 'JUMP', 37: 'STAND', 38: 'STAND_A', 39: 'STAND_B', 40: 'STAND_D_DB_BA',
+                               41: 'STAND_D_DB_BB', 42: 'STAND_D_DF_FA', 43: 'STAND_D_DF_FB', 44: 'STAND_D_DF_FC',
+                               45: 'STAND_F_D_DFA', 46: 'STAND_F_D_DFB', 47: 'STAND_FA', 48: 'STAND_FB',
+                               49: 'STAND_GUARD', 52: 'THROW_A', 53: 'THROW_B'}
 
         self.pre_framedata = None
 
@@ -31,13 +50,15 @@ class GymAI(object):
 
         self.player = player
         self.gameData = gameData
+        self.simulator = gameData.getSimulator()
 
         return 0
 
     # please define this method when you use FightingICE version 3.20 or later
     def roundEnd(self, x, y, z):
         print("send round end to {}".format(self.pipe))
-        self.pipe.send([self.obs, 0, True, None])
+        self.pipe.send([self.obs, 0, True, {}])
+        print("send obs for round End")
         self.just_inited = True
         # request = self.pipe.recv()
         # if request == "close":
@@ -50,7 +71,10 @@ class GymAI(object):
 
     def getInformation(self, frameData, isControl):
         self.pre_framedata = frameData if self.pre_framedata is None else self.frameData
-        self.frameData = frameData
+        if frameData.getFramesNumber() < 14:
+            self.frameData = frameData
+        else:
+            self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14);
         self.isControl = isControl
         self.cc.setFrameData(self.frameData, self.player)
         if frameData.getEmptyFlag():
@@ -71,19 +95,22 @@ class GymAI(object):
             if self.cc.getSkillFlag():
                 self.inputKey = self.cc.getSkillKey()
                 return
-            if not self.isControl:
-                return
+        if not self.isControl:
+            return
 
-            self.inputKey.empty()
-            self.cc.skillCancel()
+        self.inputKey.empty()
+        self.cc.skillCancel()
 
         # if just inited, should wait for first reset()
         if self.just_inited:
             request = self.pipe.recv()
+            print("Client Receive request: {}".format(request))
             if request == "reset":
                 self.just_inited = False
                 self.obs = self.get_obs()
+                print("Just reset")
                 self.pipe.send(self.obs)
+                print("Client send obs for new game")
             else:
                 raise ValueError
         # if not just inited but self.obs is none, it means second/thrid round just started
@@ -91,18 +118,28 @@ class GymAI(object):
         elif self.obs is None:
             self.obs = self.get_obs()
             self.pipe.send(self.obs)
+            print("Client send obs for new round")
         # if there is self.obs, do step() and return [obs, reward, done, info]
         else:
+            self.get_enough_energy_actions()
             self.obs = self.get_obs()
             self.reward = self.get_reward()
-            self.pipe.send([self.obs, self.reward, False, None])
+            dict = {}
+            dict['my_action_enough'] = self.my_actions_enough
+            dict['currentFrameNumber'] = self.frameData.getFramesNumber()
+            dict['currentRound'] = self.frameData.getRound()
+            dict['remainingTime'] = self.frameData.getRemainingTime()
+            self.pipe.send([self.obs, self.reward, False, dict])
+            print("Client send obs for step")
 
         #print("waitting for step in {}".format(self.pipe))
         request = self.pipe.recv()
+        print("Client Receive request: {}".format(request))
         #print("get step in {}".format(self.pipe))
         if len(request) == 2 and request[0] == "step":
             action = request[1]
             self.cc.commandCall(self.action_strs[action])
+            print("Step Action: {}".format(self.action_strs[action]))
             if not self.frameskip:
                 self.inputKey = self.cc.getSkillKey()
 
@@ -120,11 +157,11 @@ class GymAI(object):
                 p1_hit_count_now = self.frameData.getCharacter(True).getHitCount()
                 p2_hit_count_now = self.frameData.getCharacter(False).getHitCount()
                 if self.player:
-                    reward = (p2_hp_pre-p2_hp_now) - (p1_hp_pre-p1_hp_now) \
-                             + (p1_hit_count_now - p2_hit_count_now) - (frame_num_now - frame_num_pre) / 60
+                    reward = (p2_hp_pre-p2_hp_now) - (p1_hp_pre-p1_hp_now)
+                             # + (p1_hit_count_now - p2_hit_count_now) - (frame_num_now - frame_num_pre) / 60
                 else:
-                    reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now) \
-                             + (p2_hit_count_now - p1_hit_count_now) - (frame_num_now - frame_num_pre) / 60
+                    reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now)
+                             # + (p2_hit_count_now - p1_hit_count_now) - (frame_num_now - frame_num_pre) / 60
         except:
             reward = 0
         return reward
@@ -150,6 +187,7 @@ class GymAI(object):
         myRemainingFrame = my.getRemainingFrame() / 70
         myState = my.getState().ordinal()
         myAction = my.getAction().ordinal()
+        print("My state {}".format(my.getState()))
 
         # opp information
         oppHp = abs(opp.getHp() / 400)
@@ -344,6 +382,31 @@ class GymAI(object):
         observation = np.array(observation, dtype=np.float32)
         observation = np.clip(observation, 0, 1)
         return observation
+
+    def get_enough_energy_actions(self):
+        self.my_actions_enough = {}
+        self.opp_actions_enough = {}
+        my = self.frameData.getCharacter(self.player)
+        opp = self.frameData.getCharacter(not self.player)
+        if my.getState == "AIR":
+            my_actions = self.actions_air
+        else:
+            my_actions = self.actions_ground
+        if opp.getState == "AIR":
+            opp_actions = self.actions_air
+        else:
+            opp_actions = self.actions_ground
+
+        my_motion_data = self.gameData.getMotionData(self.player)
+        opp_motion_data = self.gameData.getMotionData(not self.player)
+        my_motion_names = [motion.getActionName() for motion in my_motion_data]
+        opp_motion_names = [motion.getActionName() for motion in opp_motion_data]
+        for act in my_actions:
+            if my_motion_data[my_motion_names.index(my_actions[act])].getAttackStartAddEnergy()+my.getEnergy() >= 0:
+                self.my_actions_enough[act] = my_actions[act]
+        for act in opp_actions:
+            if my_motion_data[opp_motion_names.index(opp_actions[act])].getAttackStartAddEnergy()+opp.getEnergy() >= 0:
+                self.opp_actions_enough[act] = opp_actions[act]
 
     # This part is mandatory
     class Java:
