@@ -388,11 +388,11 @@ class GymAI(object):
         self.opp_actions_enough = {}
         my = self.frameData.getCharacter(self.player)
         opp = self.frameData.getCharacter(not self.player)
-        if my.getState == "AIR":
+        if str(my.getState().name()) == "AIR":
             my_actions = self.actions_air
         else:
             my_actions = self.actions_ground
-        if opp.getState == "AIR":
+        if str(opp.getState().name()) == "AIR":
             opp_actions = self.actions_air
         else:
             opp_actions = self.actions_ground
