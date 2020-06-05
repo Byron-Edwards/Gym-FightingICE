@@ -5,7 +5,7 @@ import subprocess
 import time
 from multiprocessing import Pipe
 from threading import Thread
-
+import logging
 import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
@@ -15,6 +15,7 @@ from py4j.java_gateway import (CallbackServerParameters, GatewayParameters,
 import gym_fightingice
 from gym_fightingice.envs.gym_ai import GymAI
 from gym_fightingice.envs.Machete import Machete
+logging.basicConfig(level=logging.DEBUG)
 
 
 def game_thread(env):
@@ -23,7 +24,7 @@ def game_thread(env):
         env.manager.runGame(env.game_to_start)
     except:
         env.game_started = False
-        print("Please IGNORE the Exception above because of restart java game")
+        logging.warning("Please IGNORE the Exception above because of restart java game")
 
 class FightingiceEnv_Data_NoFrameskip(gym.Env):
     metadata = {'render.modes': ['human']}
@@ -69,7 +70,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
             if java_version == b"\n":
                 raise ModuleNotFoundError("Java is not installed")
         else:
-            print("Please make sure you can run java if you see some error")
+            logging.warning("Please make sure you can run java if you see some error")
 
         # second check if FightingIce is installed correct
         start_jar_path = os.path.join(self.java_env_path, "FightingICE.jar")
@@ -102,7 +103,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
 
     def _start_java_game(self):
         # start game
-        print("Start java env in {} and port {}".format(self.java_env_path, self.port))
+        logging.info("Start java env in {} and port {}".format(self.java_env_path, self.port))
         devnull = open(os.devnull, 'w')
 
         if self.system_name == "windows":
@@ -123,7 +124,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
                                             "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400", "--disable-window"])
         # self.java_env = subprocess.Popen(["java", "-cp", "/home/myt/gym-fightingice/gym_fightingice/FightingICE.jar:/home/myt/gym-fightingice/gym_fightingice/lib/lwjgl/*:/home/myt/gym-fightingice/gym_fightingice/lib/natives/linux/*:/home/myt/gym-fightingice/gym_fightingice/lib/*", "Main", "--port", str(self.free_port), "--py4j", "--c1", "ZEN", "--c2", "ZEN","--fastmode", "--grey-bg", "--inverted-player", "1", "--mute"])
         # sleep 3s for java starting, if your machine is slow, make it longer
-        print("wait for Java starting...")
+        logging.info("wait for Java starting...")
         time.sleep(3)
 
     def _start_gateway(self, p2=Machete):
@@ -209,10 +210,10 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
 
         # just reset is anything ok
         self.pipe.send("reset")
-        print("Server send Reset")
+        logging.debug("Server send Reset")
         self.round_num += 1
         obs = self.pipe.recv()
-        print("Server receive obs for new round")
+        logging.debug("Server receive obs for new round")
         return obs
 
     def step(self, action):
@@ -222,17 +223,15 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         if self.game_started is False:
             dict = {}
             dict["pre_game_crashed"] = True
-            print(dict)
+            logging.debug(dict)
             self.close()
             return self.reset(), 0, None, dict
 
         self.pipe.send(["step", action])
-        print("Server send Step, {}".format(action))
+        logging.debug("Server send Step, {}".format(action))
         if self.pipe.poll(1):
             message =self.pipe.recv()
-            print("Server receive obs for Step")
-            if len(message)<4:
-                print("here")
+            logging.debug("Server receive obs for Step")
             new_obs, reward, done, dict = message
         else:
             new_obs, reward = self.p1.get_obs(), self.p1.get_reward()
@@ -245,7 +244,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
                 done = False
             dict = {}
             dict["no_data_receive"] = True
-            print("server can not receive, request to reset the game")
+            logging.warning("server can not receive, request to reset the game")
             return new_obs, reward, done, dict
         return new_obs, reward, done, dict
 
