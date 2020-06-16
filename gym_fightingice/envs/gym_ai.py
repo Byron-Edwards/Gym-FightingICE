@@ -5,7 +5,6 @@ from py4j.java_gateway import get_field
 
 class GymAI(object):
     def __init__(self, gateway, pipe, frameskip=True):
-        logging.basicConfig(level=logging.DEBUG)
         self.gateway = gateway
         self.pipe = pipe
         self.width = 96  # The width of the display to obtain
@@ -58,10 +57,13 @@ class GymAI(object):
         return 0
 
     # please define this method when you use FightingICE version 3.20 or later
-    def roundEnd(self, x, y, z):
-        logging.debug("send round end to {}".format(self.pipe))
-        self.pipe.send([self.obs, 0, True, {}])
-        logging.debug("send obs for round End")
+    def roundEnd(self, p1hp,p2hp, frames):
+        print("send round end to {}".format(self.pipe))
+        dic = dict()
+        dic['distance'] = self.frameData.getDistanceX()
+        dic['myHp'], dic['oppHp'] = p1hp, p2hp,
+        self.pipe.send([self.obs, self.reward, True, dic])
+        print("send obs for round End")
         self.just_inited = True
         # request = self.pipe.recv()
         # if request == "close":
@@ -74,12 +76,11 @@ class GymAI(object):
 
     def getInformation(self, frameData, isControl):
         # self.pre_framedata = frameData if self.pre_framedata is None else self.frameData
+        self.frameData = frameData
         if frameData.getFramesNumber() < 14:
             self.frameData = frameData
-            # logging.debug("Not Using Simulator")
         else:
             self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14)
-            # logging.debug("Using Simulator")
         self.isControl = isControl
         self.cc.setFrameData(self.frameData, self.player)
         if frameData.getEmptyFlag():
@@ -108,14 +109,18 @@ class GymAI(object):
 
         # if just inited, should wait for first reset()
         if self.just_inited:
-            request = self.pipe.recv()
-            logging.debug("Client Receive request: {}".format(request))
+            if self.pipe.poll(5):
+                request = self.pipe.recv()
+                print("Client Receive request: {}".format(request))
+            else:
+                print("Client receive time out")
+                return
             if request == "reset":
                 self.just_inited = False
                 self.obs = self.get_obs()
-                logging.debug("Just reset")
+                print("Just reset")
                 self.pipe.send(self.obs)
-                logging.debug("Client send obs for new game")
+                print("Client send obs for new game")
             else:
                 raise ValueError
         # if not just inited but self.obs is none, it means second/thrid round just started
@@ -123,35 +128,42 @@ class GymAI(object):
         elif self.obs is None:
             self.obs = self.get_obs()
             self.pipe.send(self.obs)
-            logging.debug("Client send obs for new round")
+            print("Client send obs for new round")
         # if there is self.obs, do step() and return [obs, reward, done, info]
         else:
             self.get_enough_energy_actions()
-            self.obs = self.get_obs()
             self.reward = self.get_reward()
-            dict = {}
-            dict['my_action_enough'] = self.my_actions_enough
-            dict['currentFrameNumber'] = self.frameData.getFramesNumber()
-            dict['currentRound'] = self.frameData.getRound()
-            dict['remainingTime'] = self.frameData.getRemainingTime()
-            self.pipe.send([self.obs, self.reward, False, dict])
-            logging.debug("Client send obs for step")
+            self.obs = self.get_obs()
+            dic = dict()
+            dic['my_action_enough'] = self.my_actions_enough
+            dic['currentFrameNumber'] = self.frameData.getFramesNumber()
+            dic['currentRound'] = self.frameData.getRound()
+            dic['remainingTime'] = self.frameData.getRemainingTime()
+            dic['distance'] = self.frameData.getDistanceX()
+            dic['myHp'], dic['oppHp'] = self.obs_dict['myHp'],self.obs_dict['oppHp'],
+            dic['oppAction']= self.obs_dict['myHp'],
+            self.pipe.send([self.obs, self.reward, False, dic])
+            print("Client send obs for step")
 
-        logging.debug("waitting for step in {}".format(self.pipe))
-        request = self.pipe.recv()
-        logging.debug("Client get step in {}".format(self.pipe))
+        print("Client waiting for step from Server")
+        if self.pipe.poll(5):
+            request = self.pipe.recv()
+            print("Client get step in {}".format(self.pipe))
+        else:
+            print("Client receive time out")
+            return
         if len(request) == 2 and request[0] == "step":
             action = request[1]
             self.cc.commandCall(self.action_strs[action])
-            logging.debug("Step Action: {}".format(self.action_strs[action]))
-            if not self.frameskip:
-                self.inputKey = self.cc.getSkillKey()
+            print("Step Action: {}".format(self.action_strs[action]))
+            # if not self.frameskip:
+            #     self.inputKey = self.cc.getSkillKey()
         self.pre_framedata = self.frameData
 
     def get_reward(self):
         try:
             if self.pre_framedata.getEmptyFlag() or self.frameData.getEmptyFlag():
-                logging.debug("pre_framedata or frameData Empty")
+                print("pre_framedata or frameData Empty")
                 reward = 0
             else:
                 p2_hp_pre = self.pre_framedata.getCharacter(False).getHp()
@@ -168,17 +180,19 @@ class GymAI(object):
                 else:
                     reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now)
                              # + (p2_hit_count_now - p1_hit_count_now) - (frame_num_now - frame_num_pre) / 60
-                logging.debug("p2_hp_pre:{},p2_hp_now:{}".format(p2_hp_pre, p2_hp_now))
-                logging.debug("p1_hp_pre:{},p1_hp_now:{}".format(p1_hp_pre, p1_hp_now))
+                print("p2_hp_pre:{},p2_hp_now:{}".format(p2_hp_pre, p2_hp_now))
+                print("p1_hp_pre:{},p1_hp_now:{}".format(p1_hp_pre, p1_hp_now))
+                # print("distance:{}".format(self.frameData.getDistanceX()))
         except Exception:
-            logging.debug(Exception)
+            print(Exception)
             reward = 0
-        logging.debug("Step reward:{}".format(reward))
+        print("Step reward:{}".format(reward))
         return reward
 
-    def get_obs(self):
-        my = self.frameData.getCharacter(self.player)
-        opp = self.frameData.getCharacter(not self.player)
+    def get_obs(self, player=True):
+        my = self.frameData.getCharacter(self.player if player else not self.player)
+        opp = self.frameData.getCharacter(not self.player if player else self.player)
+        self.obs_dict = dict()
         obs_dict = dict()
         # my information
         obs_dict['myHp'] = abs(my.getHp() / 400)
@@ -326,11 +340,12 @@ class GymAI(object):
                 obs_dict['oppGiveGuardRecov_' + str(i)] = 0
                 for key, value in self.attack_type_str.items():
                     obs_dict['oppAttackType_' + str(i) + '_' + value] = 0
-
+        self.obs_dict = obs_dict
         observation = np.array([value for key,value in obs_dict.items()], dtype=np.float32)
         observation = np.clip(observation, 0, 1)
-        logging.debug("my State: {}".format(my.getAction().name()))
-        logging.debug(obs_dict)
+        print("my State: {},opp State: {}".format(my.getState().name(), opp.getState().name()))
+        print("my Action: {}, opp Action: {}".format(my.getAction().name(), opp.getAction().name()))
+        # print(obs_dict)
         return observation
 
     def get_enough_energy_actions(self):
