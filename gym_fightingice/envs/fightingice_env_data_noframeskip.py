@@ -117,7 +117,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
                                               "--py4j", "--fastmode","-r","1000",
                                               "--grey-bg", "--inverted-player", "1",
                                               "--mute", "--limithp", "400", "400",
-                                              "--disable-window",
+                                              # "--disable-window",
                                               ],stdout=self.devnull
                                              )
         elif self.system_name == "macos":
@@ -137,12 +137,12 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
                 # read_timeout=5
             ),
             callback_server_parameters=CallbackServerParameters(
-                port=self.port +1
+                port=self.port + 1
                 # propagate_java_exceptions=True
             ),
         )
         self.python_port = self.gateway.get_callback_server().get_listening_port()
-        print("python_port:{}".format(self.python_port))
+        # print("python_port:{}".format(self.python_port))
         self.gateway.java_gateway_server.resetCallbackClient(
             self.gateway.java_gateway_server.getCallbackClient().getAddress(), self.python_port)
         self.manager = self.gateway.entry_point
@@ -212,29 +212,29 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
 
         # just reset is anything ok
         self.pipe.send("reset")
-        print("Server send Reset")
+        # print("Server send Reset")
         self.round_num += 1
         obs = self.pipe.recv()
-        print("Server receive obs for new round")
+        # print("Server receive obs for new round")
         return obs
 
     def step(self, action):
         # check if game is running, if not try restart
         # when restart, dict will contain crash info, agent should do something, it is a BUG in this version
         # inline = self.java_env.stdout.readline()
-        # print("Agent get env stdout: {}".format(inline))
+        # # print("Agent get env stdout: {}".format(inline))
         if self.game_started is False:
             dict = {}
             dict["pre_game_crashed"] = True
-            print(dict)
+            # print(dict)
             self.close()
             return self.reset(), 0, None, dict
 
         self.pipe.send(["step", action])
-        print("Server send Step, {}".format(action))
+        # print("Server send Step, {}".format(action))
         if self.pipe.poll(5):
             message =self.pipe.recv()
-            print("Server receive obs for Step")
+            # print("Server receive obs for Step")
             new_obs, reward, done, dict = message
         else:
             new_obs, reward = self.p1.get_obs(), self.p1.get_reward()
