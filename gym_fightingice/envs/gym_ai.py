@@ -1,5 +1,6 @@
 import numpy as np
 import logging
+from collections import OrderedDict
 from py4j.java_gateway import get_field
 
 
@@ -12,6 +13,7 @@ class GymAI(object):
         self.grayscale = True  # The display's color to obtain true for grayscale, false for RGB
 
         self.obs = None
+        self.dic = dict()
         self.just_inited = True
         self.attack_type_str = {1: "high", 2: "middle", 3: "low", 4: "throw"}
         self.state_strs = {0: "STAND", 1: "CROUCH", 2: "AIR", 3: "DOWN", }
@@ -37,9 +39,9 @@ class GymAI(object):
                                41: 'STAND_D_DB_BB', 42: 'STAND_D_DF_FA', 43: 'STAND_D_DF_FB', 44: 'STAND_D_DF_FC',
                                45: 'STAND_F_D_DFA', 46: 'STAND_F_D_DFB', 47: 'STAND_FA', 48: 'STAND_FB',
                                49: 'STAND_GUARD', 52: 'THROW_A', 53: 'THROW_B'}
-
+        self.forward_walk = False
+        self.forward_walk_timer = 0
         self.pre_framedata = None
-
         self.frameskip = frameskip
 
     def close(self):
@@ -58,24 +60,21 @@ class GymAI(object):
 
     # please define this method when you use FightingICE version 3.20 or later
     def roundEnd(self, p1hp,p2hp, frames):
-        print("send round end to {}".format(self.pipe))
-        dic = dict()
-        dic['distance'] = self.frameData.getDistanceX()
-        # dic['myHp'], dic['oppHp'] = self.frameData.getCharacter(True).getHp(), self.frameData.getCharacter(False).getHp()
+        self.get_enough_energy_actions()
+        self.dic['my_action_enough'] = self.my_actions_enough
         if p1hp <= p2hp:
             self.reward -= 1
-            print("Lost, p1hp:{}, p2hp:{}, frame left: {}".format(p1hp,  p2hp,frames))
-            # print("Lost, p1hp:{}, p2hp:{}".format(dic['myHp'],  dic['oppHp']))
+            print("Lost, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp,frames))
         elif p1hp > p2hp:
             self.reward += 1
-            print("Lost, p1hp:{}, p2hp:{}, frame left: {}".format(p1hp,  p2hp,frames))
-            # print("Win, p1hp:{}, p2hp:{}".format(dic['myHp'],  dic['oppHp']))
-        self.pipe.send([self.obs, self.reward, True, dic])
+            print("Win!, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp,frames))
+        self.pipe.send([self.obs, self.reward, True, self.dic])
         print("send obs for round End")
         self.just_inited = True
         # request = self.pipe.recv()
         # if request == "close":
         #     return
+        self.pre_framedata = None
         self.obs = None
 
     # Please define this method when you use FightingICE version 4.00 or later
@@ -85,10 +84,10 @@ class GymAI(object):
     def getInformation(self, frameData, isControl):
         # self.pre_framedata = frameData if self.pre_framedata is None else self.frameData
         self.frameData = frameData
-        if frameData.getFramesNumber() < 14:
-            self.frameData = frameData
-        else:
-            self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14)
+        # if frameData.getFramesNumber() < 14:
+        #     self.frameData = frameData
+        # else:
+        #     self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14)
         self.isControl = isControl
         self.cc.setFrameData(self.frameData, self.player)
         if frameData.getEmptyFlag():
@@ -111,6 +110,14 @@ class GymAI(object):
                 return
             if not self.isControl:
                 return
+
+        # make forward walk continuous until 1s or force changed by opponent
+        if self.forward_walk and self.frameData.getFramesNumber() - self.forward_walk_timer <= 60 and self.frameData.getCharacter(
+                self.player).getAction().name() == "FORWARD_WALK":
+            print("Continue forward walk, remaining frames: {}".format(self.frameData.getFramesNumber() - self.forward_walk_timer))
+            self.cc.commandCall(self.action_strs[32])
+            self.inputKey = self.cc.getSkillKey()
+            return
 
         self.inputKey.empty()
         self.cc.skillCancel()
@@ -142,15 +149,15 @@ class GymAI(object):
             self.get_enough_energy_actions()
             self.reward = self.get_reward()
             self.obs = self.get_obs()
-            dic = dict()
-            dic['my_action_enough'] = self.my_actions_enough
-            dic['currentFrameNumber'] = self.frameData.getFramesNumber()
-            dic['currentRound'] = self.frameData.getRound()
-            dic['remainingTime'] = self.frameData.getRemainingTime()
-            dic['distance'] = self.frameData.getDistanceX()
-            dic['myHp'], dic['oppHp'] = self.obs_dict['myHp'],self.obs_dict['oppHp'],
-            dic['oppAction']= self.obs_dict['myHp'],
-            self.pipe.send([self.obs, self.reward, False, dic])
+            self.dic = dict()
+            self.dic['my_action_enough'] = self.my_actions_enough
+            self.dic['currentFrameNumber'] = self.frameData.getFramesNumber()
+            self.dic['currentRound'] = self.frameData.getRound()
+            self.dic['remainingTime'] = self.frameData.getRemainingTime()
+            self.dic['distance'] = self.frameData.getDistanceX()
+            self.dic['myHp'], self.dic['oppHp'] = self.obs_dict['myHp'],self.obs_dict['oppHp'],
+            self.dic['oppAction']= self.obs_dict['myHp'],
+            self.pipe.send([self.obs, self.reward, False, self.dic])
             # print("Client send obs for step")
 
         # print("Client waiting for step from Server")
@@ -163,9 +170,17 @@ class GymAI(object):
         if len(request) == 2 and request[0] == "step":
             action = request[1]
             self.cc.commandCall(self.action_strs[action])
+
+            # make forward moving
+            if action == 32:
+                self.forward_walk = True
+                self.forward_walk_timer = self.frameData.getFramesNumber()
+            else:
+                self.forward_walk = False
+                self.forward_walk_timer = 0
             # print("Step Action: {}".format(self.action_strs[action]))
             # if not self.frameskip:
-            #     self.inputKey = self.cc.getSkillKey()
+            self.inputKey = self.cc.getSkillKey()
         self.pre_framedata = self.frameData
 
     def get_reward(self):
@@ -188,9 +203,6 @@ class GymAI(object):
                 else:
                     reward = (p1_hp_pre-p1_hp_now)/400 - (p2_hp_pre-p2_hp_now)/400
                              # + (p2_hit_count_now - p1_hit_count_now) - (frame_num_now - frame_num_pre) / 60
-                # print("p2_hp_pre:{},p2_hp_now:{}".format(p2_hp_pre, p2_hp_now))
-                # print("p1_hp_pre:{},p1_hp_now:{}".format(p1_hp_pre, p1_hp_now))
-                # # print("distance:{}".format(self.frameData.getDistanceX()))
         except Exception:
             # print(Exception)
             reward = 0
@@ -200,8 +212,8 @@ class GymAI(object):
     def get_obs(self, player=True):
         my = self.frameData.getCharacter(self.player if player else not self.player)
         opp = self.frameData.getCharacter(not self.player if player else self.player)
-        self.obs_dict = dict()
-        obs_dict = dict()
+        self.obs_dict = OrderedDict()
+        obs_dict = OrderedDict()
         # my information
         obs_dict['myHp'] = abs(my.getHp() / 400)
         obs_dict['myEnergy'] = my.getEnergy() / 300
