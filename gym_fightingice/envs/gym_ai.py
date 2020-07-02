@@ -31,11 +31,11 @@ class GymAI(object):
                             55: 'THROW_SUFFER'}
         self.actions_air = {1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
                             6: 'AIR_D_DF_FB', 7: 'AIR_DA', 8: 'AIR_DB', 9: 'AIR_F_D_DFA', 10: 'AIR_F_D_DFB',
-                            11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 16: 'AIR_UA', 17: 'AIR_UB'}
+                            11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 16: 'AIR_UA', 17: 'AIR_UB',35: 'NEUTRAL',}
 
         self.actions_ground = {18: 'BACK_JUMP', 19: 'BACK_STEP', 22: 'CROUCH_A', 23: 'CROUCH_B', 24: 'CROUCH_FA',
                                25: 'CROUCH_FB', 26: 'CROUCH_GUARD', 29: 'DASH', 31: 'FOR_JUMP', 32: 'FORWARD_WALK',
-                               33: 'JUMP', 37: 'STAND', 38: 'STAND_A', 39: 'STAND_B', 40: 'STAND_D_DB_BA',
+                               33: 'JUMP', 35: 'NEUTRAL', 37: 'STAND', 38: 'STAND_A', 39: 'STAND_B', 40: 'STAND_D_DB_BA',
                                41: 'STAND_D_DB_BB', 42: 'STAND_D_DF_FA', 43: 'STAND_D_DF_FB', 44: 'STAND_D_DF_FC',
                                45: 'STAND_F_D_DFA', 46: 'STAND_F_D_DFB', 47: 'STAND_FA', 48: 'STAND_FB',
                                49: 'STAND_GUARD', 52: 'THROW_A', 53: 'THROW_B'}
@@ -43,6 +43,7 @@ class GymAI(object):
         self.forward_walk_timer = 0
         self.pre_framedata = None
         self.frameskip = frameskip
+        self.pre_decision = None
 
     def close(self):
         pass
@@ -84,10 +85,10 @@ class GymAI(object):
     def getInformation(self, frameData, isControl):
         # self.pre_framedata = frameData if self.pre_framedata is None else self.frameData
         self.frameData = frameData
-        # if frameData.getFramesNumber() < 14:
-        #     self.frameData = frameData
-        # else:
-        #     self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14)
+        if frameData.getFramesNumber() < 14:
+            self.frameData = frameData
+        else:
+            self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14)
         self.isControl = isControl
         self.cc.setFrameData(self.frameData, self.player)
         if frameData.getEmptyFlag():
@@ -103,7 +104,6 @@ class GymAI(object):
         if self.frameData.getEmptyFlag() or self.frameData.getRemainingTime() <= 0:
             self.isGameJustStarted = True
             return
-
         if self.frameskip:
             if self.cc.getSkillFlag():
                 self.inputKey = self.cc.getSkillKey()
@@ -156,7 +156,6 @@ class GymAI(object):
             self.dic['remainingTime'] = self.frameData.getRemainingTime()
             self.dic['distance'] = self.frameData.getDistanceX()
             self.dic['myHp'], self.dic['oppHp'] = self.obs_dict['myHp'],self.obs_dict['oppHp'],
-            self.dic['oppAction']= self.obs_dict['myHp'],
             self.pipe.send([self.obs, self.reward, False, self.dic])
             # print("Client send obs for step")
 
@@ -178,25 +177,26 @@ class GymAI(object):
             else:
                 self.forward_walk = False
                 self.forward_walk_timer = 0
-            # print("Step Action: {}".format(self.action_strs[action]))
             # if not self.frameskip:
+            self.pre_decision = self.action_strs[action]
             self.inputKey = self.cc.getSkillKey()
+
         self.pre_framedata = self.frameData
 
-    def get_reward(self):
+    def get_reward(self, player=True):
         try:
             if self.pre_framedata.getEmptyFlag() or self.frameData.getEmptyFlag():
                 # print("pre_framedata or frameData Empty")
                 reward = 0
             else:
-                p2_hp_pre = self.pre_framedata.getCharacter(False).getHp()
-                p1_hp_pre = self.pre_framedata.getCharacter(True).getHp()
-                p2_hp_now = self.frameData.getCharacter(False).getHp()
-                p1_hp_now = self.frameData.getCharacter(True).getHp()
+                p2_hp_pre = self.pre_framedata.getCharacter(not self.player if player else self.player).getHp()
+                p1_hp_pre = self.pre_framedata.getCharacter(self.player if player else not self.player).getHp()
+                p2_hp_now = self.frameData.getCharacter(not self.player if player else self.player).getHp()
+                p1_hp_now = self.frameData.getCharacter(self.player if player else not self.player).getHp()
                 frame_num_pre = self.pre_framedata.getFramesNumber()
                 frame_num_now = self.frameData.getFramesNumber()
-                p1_hit_count_now = self.frameData.getCharacter(True).getHitCount()
-                p2_hit_count_now = self.frameData.getCharacter(False).getHitCount()
+                p1_hit_count_now = self.frameData.getCharacter(self.player if player else not self.player).getHitCount()
+                p2_hit_count_now = self.frameData.getCharacter(not self.player if player else self.player).getHitCount()
                 if self.player:
                     reward = (p2_hp_pre-p2_hp_now)/400 - (p1_hp_pre-p1_hp_now)/400
                              # + (p1_hit_count_now - p2_hit_count_now) - (frame_num_now - frame_num_pre) / 60
