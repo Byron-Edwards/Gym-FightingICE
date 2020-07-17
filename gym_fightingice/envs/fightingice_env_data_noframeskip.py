@@ -14,7 +14,7 @@ from py4j.java_gateway import (CallbackServerParameters, GatewayParameters,
 
 import gym_fightingice
 from gym_fightingice.envs.gym_ai import GymAI
-from gym_fightingice.envs.Machete import Machete
+from gym_fightingice.envs.gym_ai_display import GymAIDisplay
 import logging
 
 
@@ -29,17 +29,16 @@ def game_thread(env):
 class FightingiceEnv_Data_NoFrameskip(gym.Env):
     metadata = {'render.modes': ['human']}
 
-    def __init__(self, **kwargs):
+    def __init__(self, java_env_path, port, p2, freq_restart_java=3, frameskip=True, display=False, use_sim=True):
 
-        self.freq_restart_java = 20
-        self.java_env_path = os.getcwd()
-
-        if "java_env_path" in kwargs.keys():
-            self.java_env_path = kwargs["java_env_path"]
-        if "freq_restart_java" in kwargs.keys():
-            self.freq_restart_java = kwargs["freq_restart_java"]
-        if "port" in kwargs.keys():
-            self.port = kwargs["port"]
+        self.java_env_path = java_env_path if java_env_path else os.getcwd()
+        self.freq_restart_java = freq_restart_java
+        self.frameskip = frameskip
+        self.display = display
+        self.p2 = p2
+        self.use_sim = use_sim
+        if port:
+            self.port = port
         else:
             try:
                 import port_for
@@ -129,7 +128,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         logging.info("wait for Java starting...")
         time.sleep(3)
 
-    def _start_gateway(self, p2=Machete):
+    def _start_gateway(self):
         # auto select callback server port and reset it in java env
         self.gateway = JavaGateway(
             gateway_parameters=GatewayParameters(
@@ -153,23 +152,25 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         self.pipe = server
         self.client = client
         # change the no frameskip flag
-        # self.p1 = GymAI(self.gateway, self.client, False)
-        self.p1 = GymAI(self.gateway, self.client, True)
+        if self.display:
+            self.p1 = GymAIDisplay(self.gateway, self.client, self.frameskip)
+        else:
+            self.p1 = GymAI(self.gateway, self.client, self.frameskip,self.use_sim)
+
         self.manager.registerAI(self.p1.__class__.__name__, self.p1)
 
-        if isinstance(p2, str):
+        if isinstance(self.p2, str):
             # p2 is a java class name
-            self.p2 = p2
             self.game_to_start = self.manager.createGame(
                 "ZEN", "ZEN", self.p1.__class__.__name__, self.p2, self.freq_restart_java)
         else:
             # p2 is a python class
-            self.p2 = p2(self.gateway)
+            self.p2 = self.p2(self.gateway)
             self.manager.registerAI(self.p2.__class__.__name__, self.p2)
             self.game_to_start = self.manager.createGame(
                 "ZEN", "ZEN", self.p1.__class__.__name__, self.p2.__class__.__name__, self.freq_restart_java)
 
-        self.game = Thread(target=game_thread,name="game_thread", args=(self, ))
+        self.game = Thread(target=game_thread, name="game_thread", args=(self, ))
         self.game.start()
         self.game_started = True
         self.round_num = 0
@@ -190,7 +191,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
         del self.pipe
         self.game_started = False
 
-    def reset(self, p2=Machete):
+    def reset(self):
         # start java game if game is not started
         if self.game_started is False:
             try:
@@ -199,7 +200,7 @@ class FightingiceEnv_Data_NoFrameskip(gym.Env):
             except:
                 pass
             self._start_java_game()
-            self._start_gateway(p2)
+            self._start_gateway()
 
         # to provide crash, restart java game in some freq
         # if self.round_num == self.freq_restart_java * 2:  # 3 is for round in one game

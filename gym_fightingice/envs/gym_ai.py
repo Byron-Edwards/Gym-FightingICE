@@ -1,23 +1,24 @@
 import numpy as np
 import logging
+import torch
 from collections import OrderedDict
 from py4j.java_gateway import get_field
 
 
 class GymAI(object):
-    def __init__(self, gateway, pipe, frameskip=True):
+    def __init__(self, gateway, pipe, frameskip=True, use_sim=True):
         self.gateway = gateway
         self.pipe = pipe
         self.width = 96  # The width of the display to obtain
         self.height = 64  # The height of the display to obtain
         self.grayscale = True  # The display's color to obtain true for grayscale, false for RGB
-
+        self.use_sim = use_sim
         self.obs = None
         self.dic = dict()
         self.just_inited = True
         self.attack_type_str = {1: "high", 2: "middle", 3: "low", 4: "throw"}
-        self.state_strs = {0: "STAND", 1: "CROUCH", 2: "AIR", 3: "DOWN", }
-        self.action_strs = {0: 'AIR', 1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
+        self.state_strs = OrderedDict({0: "STAND", 1: "CROUCH", 2: "AIR", 3: "DOWN", })
+        self.action_strs = OrderedDict({0: 'AIR', 1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
                             6: 'AIR_D_DF_FB', 7: 'AIR_DA', 8: 'AIR_DB', 9: 'AIR_F_D_DFA', 10: 'AIR_F_D_DFB',
                             11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 14: 'AIR_GUARD_RECOV', 15: 'AIR_RECOV',
                             16: 'AIR_UA', 17: 'AIR_UB', 18: 'BACK_JUMP', 19: 'BACK_STEP', 20: 'CHANGE_DOWN',
@@ -28,10 +29,10 @@ class GymAI(object):
                             42: 'STAND_D_DF_FA', 43: 'STAND_D_DF_FB', 44: 'STAND_D_DF_FC', 45: 'STAND_F_D_DFA',
                             46: 'STAND_F_D_DFB', 47: 'STAND_FA', 48: 'STAND_FB', 49: 'STAND_GUARD',
                             50: 'STAND_GUARD_RECOV', 51: 'STAND_RECOV', 52: 'THROW_A', 53: 'THROW_B', 54: 'THROW_HIT',
-                            55: 'THROW_SUFFER'}
-        self.actions_air = {1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
+                            55: 'THROW_SUFFER'})
+        self.actions_air = OrderedDict({1: 'AIR_A', 2: 'AIR_B', 3: 'AIR_D_DB_BA', 4: 'AIR_D_DB_BB', 5: 'AIR_D_DF_FA',
                             6: 'AIR_D_DF_FB', 7: 'AIR_DA', 8: 'AIR_DB', 9: 'AIR_F_D_DFA', 10: 'AIR_F_D_DFB',
-                            11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 16: 'AIR_UA', 17: 'AIR_UB',35: 'NEUTRAL',}
+                            11: 'AIR_FA', 12: 'AIR_FB', 13: 'AIR_GUARD', 16: 'AIR_UA', 17: 'AIR_UB',35: 'NEUTRAL',})
 
         self.actions_ground = {18: 'BACK_JUMP', 19: 'BACK_STEP', 22: 'CROUCH_A', 23: 'CROUCH_B', 24: 'CROUCH_FA',
                                25: 'CROUCH_FB', 26: 'CROUCH_GUARD', 29: 'DASH', 31: 'FOR_JUMP', 32: 'FORWARD_WALK',
@@ -43,7 +44,9 @@ class GymAI(object):
         self.forward_walk_timer = 0
         self.pre_framedata = None
         self.frameskip = frameskip
-        self.pre_decision = None
+        self.action_take = []
+        self.obs_dict = []
+        self.control_flag = []
 
     def close(self):
         pass
@@ -60,7 +63,7 @@ class GymAI(object):
         return 0
 
     # please define this method when you use FightingICE version 3.20 or later
-    def roundEnd(self, p1hp,p2hp, frames):
+    def roundEnd(self, p1hp, p2hp, frames):
         self.get_enough_energy_actions()
         self.dic['my_action_enough'] = self.my_actions_enough
         if p1hp <= p2hp:
@@ -69,12 +72,18 @@ class GymAI(object):
         elif p1hp > p2hp:
             self.reward += 1
             print("Win!, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp,frames))
+        opp_obs = self.get_obs(player=False)
+        opp_reward = -self.reward
+        self.dic['opp_transit'] = [opp_obs, opp_reward, True, {}]
         self.pipe.send([self.obs, self.reward, True, self.dic])
         print("send obs for round End")
         self.just_inited = True
         # request = self.pipe.recv()
         # if request == "close":
         #     return
+        torch.save((self.obs_dict,self.action_take,self.control_flag),"./trajectory")
+        self.obs_dict = []
+        self.action_take = []
         self.pre_framedata = None
         self.obs = None
 
@@ -85,11 +94,12 @@ class GymAI(object):
     def getInformation(self, frameData, isControl):
         # self.pre_framedata = frameData if self.pre_framedata is None else self.frameData
         self.frameData = frameData
+        self.isControl = isControl
         if frameData.getFramesNumber() < 14:
             self.frameData = frameData
-        else:
+        elif self.use_sim:
             self.frameData = self.simulator.simulate(frameData, self.player, None, None, 14)
-        self.isControl = isControl
+
         self.cc.setFrameData(self.frameData, self.player)
         if frameData.getEmptyFlag():
             return
@@ -111,6 +121,7 @@ class GymAI(object):
             if not self.isControl:
                 return
 
+        self.control_flag.append(self.isControl)
         # make forward walk continuous until 1s or force changed by opponent
         if self.forward_walk and self.frameData.getFramesNumber() - self.forward_walk_timer <= 60 and self.frameData.getCharacter(
                 self.player).getAction().name() == "FORWARD_WALK":
@@ -149,13 +160,15 @@ class GymAI(object):
             self.get_enough_energy_actions()
             self.reward = self.get_reward()
             self.obs = self.get_obs()
+            opp_obs = self.get_obs(player=False)
+            opp_reward = -self.reward
             self.dic = dict()
             self.dic['my_action_enough'] = self.my_actions_enough
             self.dic['currentFrameNumber'] = self.frameData.getFramesNumber()
             self.dic['currentRound'] = self.frameData.getRound()
             self.dic['remainingTime'] = self.frameData.getRemainingTime()
             self.dic['distance'] = self.frameData.getDistanceX()
-            self.dic['myHp'], self.dic['oppHp'] = self.obs_dict['myHp'],self.obs_dict['oppHp'],
+            self.dic['opp_transit'] = [opp_obs, opp_reward, False, {}]
             self.pipe.send([self.obs, self.reward, False, self.dic])
             # print("Client send obs for step")
 
@@ -178,7 +191,8 @@ class GymAI(object):
                 self.forward_walk = False
                 self.forward_walk_timer = 0
             # if not self.frameskip:
-            self.pre_decision = self.action_strs[action]
+            self.action_take.append(self.action_strs[action])
+            # print("Action_taken: {}".format(self.action_strs[action]))
             self.inputKey = self.cc.getSkillKey()
 
         self.pre_framedata = self.frameData
@@ -212,7 +226,6 @@ class GymAI(object):
     def get_obs(self, player=True):
         my = self.frameData.getCharacter(self.player if player else not self.player)
         opp = self.frameData.getCharacter(not self.player if player else self.player)
-        self.obs_dict = OrderedDict()
         obs_dict = OrderedDict()
         # my information
         obs_dict['myHp'] = abs(my.getHp() / 400)
@@ -360,11 +373,12 @@ class GymAI(object):
                 obs_dict['oppGiveGuardRecov_' + str(i)] = 0
                 for key, value in self.attack_type_str.items():
                     obs_dict['oppAttackType_' + str(i) + '_' + value] = 0
-        self.obs_dict = obs_dict
+        self.obs_dict.append(obs_dict)
         observation = np.array([value for key,value in obs_dict.items()], dtype=np.float32)
         observation = np.clip(observation, 0, 1)
-        # print("my State: {},opp State: {}".format(my.getState().name(), opp.getState().name()))
-        # print("my Action: {}, opp Action: {}".format(my.getAction().name(), opp.getAction().name()))
+        # print("Frames: {}".format(self.frameData.getFramesNumber()))
+        # print("my \t Action: {}, \tState: {}, \tisControl: {}".format(my.getAction().name(), my.getState().name(), my.isControl()))
+        # print("opp \tAction: {}, \tState: {}, \tisControl: {}".format(opp.getAction().name(), opp.getState().name(), opp.isControl()))
         # # print(obs_dict)
         return observation
 
