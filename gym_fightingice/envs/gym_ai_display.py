@@ -44,11 +44,12 @@ class GymAIDisplay(object):
             # self.reward += 1
             print("Win!, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp,frames))
         self.pipe.send([self.obs, 0, True, {}])
-
-        request = self.pipe.recv()
-        if request == "close":
-            return
         self.obs = None
+        self.just_inited = True
+        # request = self.pipe.recv()
+        # if request == "close":
+        #     return
+
 
     # Please define this method when you use FightingICE version 4.00 or later
     def getScreenData(self, sd):
