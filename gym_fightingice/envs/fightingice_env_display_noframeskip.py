@@ -5,7 +5,7 @@ import subprocess
 import time
 from multiprocessing import Pipe
 from threading import Thread
-
+import logging
 import gym
 from gym import error, spaces, utils
 from gym.utils import seeding
@@ -202,8 +202,16 @@ class FightingiceEnv_Display_NoFrameskip(gym.Env):
             return self.reset(), 0, None, dict
 
         self.pipe.send(["step", action])
-        new_obs, reward, done, info = self.pipe.recv()
-        return new_obs, reward, done, {}
+        if self.pipe.poll(5):
+            message = self.pipe.recv()
+            new_obs, reward, done, dict = message
+        else:
+            new_obs, reward = self.p1.get_obs(), self.p1.get_reward()
+            dict = {}
+            dict["no_data_receive"] = True
+            logging.warning("server can not receive, request to reset the game")
+            return new_obs, reward, True, dict
+        return new_obs, reward, done, dict
 
     def render(self, mode='human'):
         # no need

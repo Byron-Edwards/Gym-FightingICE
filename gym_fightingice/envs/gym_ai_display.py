@@ -36,8 +36,15 @@ class GymAIDisplay(object):
         return 0
 
     # please define this method when you use FightingICE version 3.20 or later
-    def roundEnd(self, x, y, z):
-        self.pipe.send([self.obs, 0, True, None])
+    def roundEnd(self, p1hp, p2hp, frames):
+        if p1hp <= p2hp:
+            # self.reward -= 1
+            print("Lost, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp,frames))
+        elif p1hp > p2hp:
+            # self.reward += 1
+            print("Win!, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp,frames))
+        self.pipe.send([self.obs, 0, True, {}])
+
         request = self.pipe.recv()
         if request == "close":
             return
@@ -103,7 +110,7 @@ class GymAIDisplay(object):
         else:
             self.obs = self.get_obs()
             self.reward = self.get_reward()
-            self.pipe.send([self.obs, self.reward, False, None])
+            self.pipe.send([self.obs, self.reward, False, {"isControl": self.isControl}])
 
         request = self.pipe.recv()
         if len(request) == 2 and request[0] == "step":
