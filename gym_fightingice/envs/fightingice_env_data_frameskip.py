@@ -117,6 +117,8 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
                                               "-cp", self.start_up_str,
                                               "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                               "-r", "1000",
+                                              # "--disable-window",
+                                              # "-da",
                                             "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
         elif self.system_name == "macos":
             self.java_env = subprocess.Popen(["java", "-XstartOnFirstThread", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
