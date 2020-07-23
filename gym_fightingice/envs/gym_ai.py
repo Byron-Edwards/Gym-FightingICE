@@ -18,7 +18,7 @@ class GymAI(object):
         self._attacks = "AIR_A AIR_B AIR_D_DB_BA AIR_D_DB_BB AIR_D_DF_FA AIR_D_DF_FB AIR_DA AIR_DB AIR_F_D_DFA AIR_F_D_DFB AIR_FA AIR_FB AIR_UA AIR_UB CROUCH_A CROUCH_B CROUCH_FA CROUCH_FB STAND_A STAND_B STAND_D_DB_BA STAND_D_DB_BB STAND_D_DF_FA STAND_D_DF_FB STAND_D_DF_FC STAND_F_D_DFA STAND_F_D_DFB STAND_FA STAND_FB THROW_A THROW_B"
         self.action_change = False
         self.action_strs = self._actions.split(" ")
-
+        self.last_action = None
         self.pre_framedata = None
 
         self.frameskip = frameskip
