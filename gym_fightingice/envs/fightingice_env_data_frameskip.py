@@ -1,6 +1,5 @@
 import os
 import platform
-import random
 import subprocess
 import time
 from multiprocessing import Pipe
@@ -32,7 +31,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
     def __init__(self, **kwargs):
         #  freq_restart_java=3, env_config=None, java_env_path=None, port=None, auto_start_up=False
 
-        self.freq_restart_java = 3
+        self.freq_restart_java = 1
         self.java_env_path = os.getcwd()
 
         if "java_env_path" in kwargs.keys():
@@ -73,7 +72,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
             print("Please make sure you can run java if you see some error")
 
         # second check if FightingIce is installed correct
-        start_jar_path = os.path.join(self.java_env_path, "FightingICE.jar")
+        start_jar_path = os.path.join(self.java_env_path, "NewFightingICE.jar")
         start_data_path = os.path.join(self.java_env_path, "data")
         start_lib_path = os.path.join(self.java_env_path, "lib")
         lwjgl_path = os.path.join(start_lib_path, "lwjgl", "*")
@@ -106,20 +105,21 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
         # start game
         print("Start java env in {} and port {}".format(
             self.java_env_path, self.port))
-        devnull = open(os.devnull, 'w')
+        devnull = subprocess.DEVNULL
 
         if self.system_name == "windows":
             # -Xms1024m -Xmx1024m we need set this in windows
             self.java_env = subprocess.Popen(["java", "-Xms1024m", "-Xmx1024m", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                           "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
         elif self.system_name == "linux":
-            self.java_env = subprocess.Popen(["java", "-Dsun.reflect.inflationThreshold=2147483647",
+            self.java_env = subprocess.Popen(["java", "-Xms1g", "-Xmx1g",
                                               "-cp", self.start_up_str,
                                               "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                               "-r", "1000",
-                                              # "--disable-window",
-                                              # "-da",
-                                            "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
+                                              "--disable-window",
+                                              # "-da","--inverted-player", "1",
+                                              "--grey-bg",
+                                              "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
         elif self.system_name == "macos":
             self.java_env = subprocess.Popen(["java", "-XstartOnFirstThread", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                             "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
@@ -130,7 +130,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
     def _start_gateway(self, p2=Machete):
         # auto select callback server port and reset it in java env
         self.gateway = JavaGateway(gateway_parameters=GatewayParameters(
-            port=self.port, enable_memory_management=True,), callback_server_parameters=CallbackServerParameters(port=self.port + 1 ))
+            port=self.port, enable_memory_management=True,), callback_server_parameters=CallbackServerParameters(port=0))
         python_port = self.gateway.get_callback_server().get_listening_port()
         self.gateway.java_gateway_server.resetCallbackClient(
             self.gateway.java_gateway_server.getCallbackClient().getAddress(), python_port)
