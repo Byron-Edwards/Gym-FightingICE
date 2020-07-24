@@ -72,7 +72,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
             print("Please make sure you can run java if you see some error")
 
         # second check if FightingIce is installed correct
-        start_jar_path = os.path.join(self.java_env_path, "NewFightingICE.jar")
+        start_jar_path = os.path.join(self.java_env_path, "FightingICE.jar")
         start_data_path = os.path.join(self.java_env_path, "data")
         start_lib_path = os.path.join(self.java_env_path, "lib")
         lwjgl_path = os.path.join(start_lib_path, "lwjgl", "*")
@@ -114,23 +114,25 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
         elif self.system_name == "linux":
             self.java_env = subprocess.Popen(["java", "-Xms1g", "-Xmx1g",
                                               "-cp", self.start_up_str,
-                                              "Main", "--port", str(self.port), "--py4j", "--fastmode",
+                                              "Main", "--port", str(self.port), "--py4j",
+                                              # "--fastmode",
                                               "-r", "1000",
-                                              "--disable-window",
+                                              # "--disable-window",
                                               # "-da","--inverted-player", "1",
                                               "--grey-bg",
-                                              "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
+                                              "--mute", "--limithp", "400", "400"], stdout=devnull)
         elif self.system_name == "macos":
             self.java_env = subprocess.Popen(["java", "-XstartOnFirstThread", "-cp", self.start_up_str, "Main", "--port", str(self.port), "--py4j", "--fastmode",
                                             "--grey-bg", "--inverted-player", "1", "--mute", "--limithp", "400", "400"], stdout=devnull, stderr=devnull)
         # self.java_env = subprocess.Popen(["java", "-cp", "/home/myt/gym-fightingice/gym_fightingice/FightingICE.jar:/home/myt/gym-fightingice/gym_fightingice/lib/lwjgl/*:/home/myt/gym-fightingice/gym_fightingice/lib/natives/linux/*:/home/myt/gym-fightingice/gym_fightingice/lib/*", "Main", "--port", str(self.free_port), "--py4j", "--c1", "ZEN", "--c2", "ZEN","--fastmode", "--grey-bg", "--inverted-player", "1", "--mute"])
         # sleep 3s for java starting, if your machine is slow, make it longer
-        time.sleep(3)
+        time.sleep(5)
 
     def _start_gateway(self, p2=Machete):
         # auto select callback server port and reset it in java env
+        print("Fighting with {}".format(p2))
         self.gateway = JavaGateway(gateway_parameters=GatewayParameters(
-            port=self.port, enable_memory_management=True,), callback_server_parameters=CallbackServerParameters(port=0))
+            port=self.port, enable_memory_management=True,), callback_server_parameters=CallbackServerParameters(port=self.port + 1))
         python_port = self.gateway.get_callback_server().get_listening_port()
         self.gateway.java_gateway_server.resetCallbackClient(
             self.gateway.java_gateway_server.getCallbackClient().getAddress(), python_port)
@@ -213,7 +215,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
             return self.reset(), 0, None, dict
 
         self.pipe.send(["step", action])
-        if self.pipe.poll(5):
+        if self.pipe.poll(30):
             message =self.pipe.recv()
             # print("Server receive obs for Step")
             new_obs, reward, done, dict = message
