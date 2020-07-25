@@ -1,6 +1,6 @@
 import numpy as np
 from py4j.java_gateway import get_field
-
+import time
 
 class GymAI(object):
     def __init__(self, gateway, pipe, frameskip=True):
@@ -51,6 +51,8 @@ class GymAI(object):
         # if request == "close":
         #     return
         self.obs = None
+        # Make Sure one round is really end
+        time.sleep(1)
 
     # Please define this method when you use FightingICE version 4.00 or later
     def getScreenData(self, sd):
@@ -131,7 +133,12 @@ class GymAI(object):
                     reward = (p2_hp_pre-p2_hp_now) - (p1_hp_pre-p1_hp_now)
                     # reward shaping
                     if p2_hp_pre-p2_hp_now <= 0 and self.last_action in self._attacks.split():
-                        reward -= 0.1
+                        reward -= 0.2
+                    if p1_hp_now <= p2_hp_now:
+                        reward -= self.frameData.getDistanceX() * 0.002
+                    # else:
+                    #     reward += self.frameData.getDistanceX() * 0.002
+                    reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 0.008
                 else:
                     reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now)
         except:
