@@ -134,13 +134,18 @@ class GymAI(object):
                     # reward shaping
                     if p2_hp_pre-p2_hp_now <= 0 and self.last_action in self._attacks.split():
                         reward -= 0.2
-                    if p1_hp_now <= p2_hp_now:
-                        reward -= self.frameData.getDistanceX() * 0.002
+                    reward -= self.frameData.getDistanceX() * 0.01
                     # else:
                     #     reward += self.frameData.getDistanceX() * 0.002
-                    reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 0.008
+                    reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 1
                 else:
                     reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now)
+                    if p1_hp_pre-p1_hp_now <= 0 and self.last_action in self._attacks.split():
+                        reward -= 0.2
+                    reward -= self.frameData.getDistanceX() * 0.01
+                    # else:
+                    #     reward += self.frameData.getDistanceX() * 0.002
+                    reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 1
         except:
             reward = 0
         return reward
