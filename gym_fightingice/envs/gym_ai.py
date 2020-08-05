@@ -19,6 +19,7 @@ class GymAI(object):
         self.action_change = False
         self.action_strs = self._actions.split(" ")
         self.last_action = None
+        self.action = None
         self.pre_framedata = None
 
         self.frameskip = frameskip
@@ -111,11 +112,18 @@ class GymAI(object):
         #print("get step in {}".format(self.pipe))
         if len(request) == 2 and request[0] == "step":
             action = request[1]
-            self.cc.commandCall(self.action_strs[action])
-            if self.action_strs[action] != self.last_action:
+            action = self.action_strs[action]
+            if str(action) == "CROUCH_GUARD":
+                action = "1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1 1"
+            elif str(action) == "STAND_GUARD":
+                action = "4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4 4"
+            elif str(action) == "AIR_GUARD":
+                action = "7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7 7"
+            self.cc.commandCall(action)
+            if self.action != self.last_action:
                 self.action_change = True
             # reward shaping with no effect attack action
-            self.last_action = self.action_strs[action]
+            self.last_action = self.action
             if not self.frameskip:
                 self.inputKey = self.cc.getSkillKey()
         self.pre_framedata = self.frameData
