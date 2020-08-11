@@ -40,14 +40,18 @@ class GymAI(object):
     # please define this method when you use FightingICE version 3.20 or later
     def roundEnd(self, p1hp, p2hp, frames):
         print("send round end to {}".format(self.pipe))
-        self.pipe.send([self.obs, self.get_reward(), True, {}])
-        self.just_inited = True
+        info = dict()
         if p1hp <= p2hp:
-            self.reward -= 1
+            # self.reward -= 1
             print("Lost, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp, frames))
+            info["win"] = False
         elif p1hp > p2hp:
-            self.reward += 1
+            # self.reward += 1
             print("Win!, p1hp:{}, p2hp:{}, frame used: {}".format(p1hp,  p2hp, frames))
+            info["win"] = True
+        self.pipe.send([self.obs, self.get_reward(), True, info])
+        self.just_inited = True
+
         # request = self.pipe.recv()
         # if request == "close":
         #     return
@@ -140,20 +144,20 @@ class GymAI(object):
                 if self.player:
                     reward = (p2_hp_pre-p2_hp_now) - (p1_hp_pre-p1_hp_now)
                     # reward shaping
-                    if p2_hp_pre-p2_hp_now <= 0 and self.last_action in self._attacks.split():
-                        reward -= 0.2
-                    reward -= self.frameData.getDistanceX() * 0.01
-                    # else:
-                    #     reward += self.frameData.getDistanceX() * 0.002
-                    reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 1
+                    # if p2_hp_pre-p2_hp_now <= 0 and self.last_action in self._attacks.split():
+                    #     reward -= 0.2
+                    # reward -= self.frameData.getDistanceX() * 0.01
+                    # # else:
+                    # #     reward += self.frameData.getDistanceX() * 0.002
+                    # reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 1
                 else:
                     reward = (p1_hp_pre-p1_hp_now) - (p2_hp_pre-p2_hp_now)
-                    if p1_hp_pre-p1_hp_now <= 0 and self.last_action in self._attacks.split():
-                        reward -= 0.2
-                    reward -= self.frameData.getDistanceX() * 0.01
-                    # else:
-                    #     reward += self.frameData.getDistanceX() * 0.002
-                    reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 1
+                    # if p1_hp_pre-p1_hp_now <= 0 and self.last_action in self._attacks.split():
+                    #     reward -= 0.2
+                    # reward -= self.frameData.getDistanceX() * 0.01
+                    # # else:
+                    # #     reward += self.frameData.getDistanceX() * 0.002
+                    # reward -= (self.frameData.getFramesNumber() - self.pre_framedata.getFramesNumber()) / 60 * 1
         except:
             reward = 0
         return reward

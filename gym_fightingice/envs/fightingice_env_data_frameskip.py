@@ -149,13 +149,13 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
             # p2 is a java class name
             self.p2 = p2
             self.game_to_start = self.manager.createGame(
-                "LUD", "LUD", self.p1.__class__.__name__, self.p2, self.freq_restart_java)
+                "ZEN", "ZEN", self.p1.__class__.__name__, self.p2, self.freq_restart_java)
         else:
             # p2 is a python class
             self.p2 = p2(self.gateway)
             self.manager.registerAI(self.p2.__class__.__name__, self.p2)
             self.game_to_start = self.manager.createGame(
-                "LUD", "LUD", self.p1.__class__.__name__, self.p2.__class__.__name__, self.freq_restart_java)
+                "ZEN", "ZEN", self.p1.__class__.__name__, self.p2.__class__.__name__, self.freq_restart_java)
         self.game = Thread(target=game_thread,
                            name="game_thread", args=(self, ))
         self.game.start()
