@@ -44,6 +44,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
             try:
                 import port_for
                 self.port = port_for.select_random()  # select one random port for java env
+                self.callback_port = port_for.select_random()
             except:
                 raise ImportError(
                     "Pass port=[your_port] when make env, or install port_for to set startup port automatically, maybe pip install port_for can help")
@@ -116,8 +117,8 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
                                               "-cp", self.start_up_str,
                                               "Main", "--port", str(self.port), "--py4j",
                                               # "--fastmode",
-                                              "-r", "1000",
-                                              # "--disable-window",
+                                              "-r", "100000",
+                                              "--disable-window",
                                               # "-da","--inverted-player", "1",
                                               "--grey-bg",
                                               "--mute", "--limithp", "400", "400"], stdout=devnull)
@@ -132,7 +133,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
         # auto select callback server port and reset it in java env
         print("Fighting with {}".format(p2))
         self.gateway = JavaGateway(gateway_parameters=GatewayParameters(
-            port=self.port, enable_memory_management=True,), callback_server_parameters=CallbackServerParameters(port=self.port + 1))
+            port=self.port, enable_memory_management=True,), callback_server_parameters=CallbackServerParameters(port=self.callback_port))
         python_port = self.gateway.get_callback_server().get_listening_port()
         self.gateway.java_gateway_server.resetCallbackClient(
             self.gateway.java_gateway_server.getCallbackClient().getAddress(), python_port)
