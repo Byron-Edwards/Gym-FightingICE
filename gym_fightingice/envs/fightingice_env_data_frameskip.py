@@ -117,7 +117,7 @@ class FightingiceEnv_Data_Frameskip(gym.Env):
                                               "-cp", self.start_up_str,
                                               "Main", "--port", str(self.port), "--py4j",
                                               # "--fastmode",
-                                              "-r", "100000",
+                                              "-r", "1000",
                                               "--disable-window",
                                               # "-da","--inverted-player", "1",
                                               "--grey-bg",
